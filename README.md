@@ -12,6 +12,7 @@ notifier := watcher.NewTickNotifier(updateInterval) // tick触发器
 loaderA := watcher.NewLoader(ctx, notifier, watcher.WithTransformer(func(ctx context.Context, v interface{}) interface{} {
     return serviceA.GetSomething() // 执行拉取函数
 }))
+loaderA.Start(ctx) // 启动加载器
 
 // b.go
 // B模块不关心A模块的值什么时候更新，直接使用即可
@@ -22,7 +23,7 @@ func AnyWhere() {
 
 // c.go
 // C模块监听A模块的值更新
-watcher.WatchLoader(loaderA, func(ctx context.Context, v interface{}) interface{} {
+watcher.WatchLoader(loaderA, func(ctx context.Context, v interface{}) {
     fmt.Println(v) // 每次A模块更新值时进行打印
 })
 ```
