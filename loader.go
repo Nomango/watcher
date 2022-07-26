@@ -53,7 +53,10 @@ func (l *Loader) apply(opts ...LoaderOption) {
 }
 
 func (l *Loader) receive(ctx context.Context, v interface{}) {
-	for _, t := range l.transforms {
+	l.mu.Lock()
+	transforms := l.transforms
+	l.mu.Unlock()
+	for _, t := range transforms {
 		v = t(ctx, v)
 	}
 	l.v.Store(v)

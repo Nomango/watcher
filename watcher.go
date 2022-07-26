@@ -2,8 +2,7 @@ package watcher
 
 import (
 	"context"
-
-	"github.com/Nomango/ark/logs"
+	"log"
 )
 
 // Watch executes f every time n triggers
@@ -14,35 +13,42 @@ func Watch(ctx context.Context, n Notifier, f Executer) {
 type Executer = func(context.Context, interface{})
 
 type Watcher struct {
-	n    Notifier
-	f    Executer
-	stop chan struct{}
+	n      Notifier
+	f      Executer
+	stop   chan struct{}
+	logger Logger
 }
 
-func NewWatcher(n Notifier, f Executer) *Watcher {
-	return &Watcher{
+func NewWatcher(n Notifier, f Executer, opts ...WatcherOption) *Watcher {
+	w := &Watcher{
 		n:    n,
 		f:    f,
 		stop: make(chan struct{}),
 	}
+	for _, opt := range opts {
+		opt(w)
+	}
+	if w.logger == nil {
+		w.logger = &stdLogger{}
+	}
+	return w
 }
 
 func (w *Watcher) Start(ctx context.Context) {
-	ctx = logs.CtxWithKVs(ctx, logs.KV("from", "watcher"))
 	go func() {
 		for {
 			select {
 			case v, ok := <-w.n:
 				if !ok {
-					logs.CtxNoticef(ctx, "notifier is closed")
+					w.logger.Info("[watcher] notifier is closed")
 					return
 				}
 				w.Execute(ctx, v)
 			case <-ctx.Done():
-				logs.CtxNoticef(ctx, "context is done, err=%v", ctx.Err())
+				w.logger.Info("[watcher] context is done, err=%v", ctx.Err())
 				return
 			case <-w.stop:
-				logs.CtxNoticef(ctx, "watcher is stoped")
+				w.logger.Info("[watcher] stoped")
 				return
 			}
 		}
@@ -60,8 +66,31 @@ func (w *Watcher) GetNotifier() Notifier {
 func (w *Watcher) Execute(ctx context.Context, v interface{}) {
 	defer func() {
 		if e := recover(); e != nil {
-			logs.CtxErrorf(ctx, "PANIC occurred!!! msg=%v", e)
+			w.logger.Error("[watcher] PANIC occurred!!! msg=%v", e)
 		}
 	}()
 	w.f(ctx, v)
+}
+
+type WatcherOption func(*Watcher)
+
+type Logger interface {
+	Info(format string, args ...interface{})
+	Error(format string, args ...interface{})
+}
+
+func WithLogger(logger Logger) WatcherOption {
+	return func(w *Watcher) {
+		w.logger = logger
+	}
+}
+
+type stdLogger struct{}
+
+func (l *stdLogger) Info(format string, args ...interface{}) {
+	log.Printf(format, args...)
+}
+
+func (l *stdLogger) Error(format string, args ...interface{}) {
+	log.Fatalf(format, args...)
 }

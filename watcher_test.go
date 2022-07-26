@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nomango/ark/watcher"
+	"github.com/Nomango/watcher"
 )
 
 func TestWatcher(t *testing.T) {
